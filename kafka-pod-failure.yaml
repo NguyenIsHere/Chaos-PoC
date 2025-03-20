@@ -1,0 +1,13 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: kafka-pod-failure
+  namespace: kafka
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    labelSelectors:
+      app.kubernetes.io/instance: my-kafka
+      app.kubernetes.io/component: controller-eligible
+  duration: "30s"
