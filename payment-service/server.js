@@ -91,4 +91,16 @@ app.get('/health', (req, res) => {
 
 run().catch(console.error)
 
+const promClient = require('prom-client')
+const collectDefaultMetrics = promClient.collectDefaultMetrics
+collectDefaultMetrics()
+
+const metricsMiddleware = require('express-prometheus-middleware')
+app.use(
+  metricsMiddleware({
+    metricsPath: '/metrics',
+    collectDefaultMetrics: true
+  })
+)
+
 app.listen(3002, () => console.log('Payment Service running on port 3002'))
