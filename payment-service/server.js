@@ -1,26 +1,28 @@
 const express = require('express')
 const mongoose = require('mongoose')
 const { Kafka } = require('kafkajs')
-const Payment = require('./models/payment')
+const Payment = require('./models/payment') // Import model
 
 const app = express()
 app.use(express.json())
 
-// MongoDB Atlas Connection
+// Kết nối MongoDB
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log('Connected to MongoDB Atlas - payment-db'))
-  .catch(err => console.error('MongoDB connection error:', err))
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+  .then(() => console.log('✅ Connected to MongoDB - payment-db'))
+  .catch(err => console.error('❌ MongoDB connection error:', err))
 
-// Kafka Setup
 const kafka = new Kafka({
   clientId: 'payment-service',
-  brokers: [process.env.KAFKA_BROKERS]
+  brokers: process.env.KAFKA_BROKERS.split(',')
 })
 const consumer = kafka.consumer({ groupId: 'payment-group' })
-const producer = kafka.producer({ allowAutoTopicCreation: true })
+const producer = kafka.producer()
 
-const run = async () => {
+const runKafka = async () => {
   await producer.connect()
   await consumer.connect()
   await consumer.subscribe({ topic: 'inventory-topic', fromBeginning: true })
@@ -28,30 +30,29 @@ const run = async () => {
   await consumer.run({
     eachMessage: async ({ topic, partition, message }) => {
       const inventoryEvent = JSON.parse(message.value.toString())
-      console.log(`Received Inventory event: ${JSON.stringify(inventoryEvent)}`)
+      console.log(
+        `📥 Received Inventory event: ${JSON.stringify(inventoryEvent)}`
+      )
 
       if (inventoryEvent.status !== 'InventoryUpdated') return
 
       const session = await mongoose.startSession()
       session.startTransaction()
       try {
+        console.log(`💳 Processing payment for order ${inventoryEvent.orderId}`)
+
+        // 👉 Lưu vào MongoDB
         const payment = new Payment({
           orderId: inventoryEvent.orderId,
-          amount: inventoryEvent.totalPrice, // Lấy totalPrice từ order-service
-          status: 'Pending',
-          createdAt: new Date(),
-          updatedAt: new Date()
+          amount: inventoryEvent.totalPrice, // Dùng totalPrice từ event
+          status: 'Completed' // Thanh toán thành công
         })
         await payment.save({ session })
 
-        // Giả lập thanh toán thành công
-        payment.status = 'Completed'
-        payment.updatedAt = new Date()
-        await payment.save({ session })
-
         await session.commitTransaction()
-        console.log(`Payment processed for order ${inventoryEvent.orderId}`)
+        console.log(`✅ Payment saved for order ${inventoryEvent.orderId}`)
 
+        // Gửi event "PaymentProcessed"
         await producer.send({
           topic: 'payment-topic',
           messages: [
@@ -65,18 +66,7 @@ const run = async () => {
         })
       } catch (error) {
         await session.abortTransaction()
-        console.error(`Error processing payment: ${error.message}`)
-        await producer.send({
-          topic: 'payment-topic',
-          messages: [
-            {
-              value: JSON.stringify({
-                orderId: inventoryEvent.orderId,
-                status: 'PaymentFailed'
-              })
-            }
-          ]
-        })
+        console.error(`❌ Error processing payment: ${error.message}`)
       } finally {
         session.endSession()
       }
@@ -84,23 +74,7 @@ const run = async () => {
   })
 }
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK' })
-})
+app.get('/health', (req, res) => res.status(200).json({ status: 'OK' }))
 
-run().catch(console.error)
-
-const promClient = require('prom-client')
-const collectDefaultMetrics = promClient.collectDefaultMetrics
-collectDefaultMetrics()
-
-const metricsMiddleware = require('express-prometheus-middleware')
-app.use(
-  metricsMiddleware({
-    metricsPath: '/metrics',
-    collectDefaultMetrics: true
-  })
-)
-
-app.listen(3002, () => console.log('Payment Service running on port 3002'))
+app.listen(3002, () => console.log('🚀 Payment Service running on port 3002'))
+runKafka().catch(console.error)

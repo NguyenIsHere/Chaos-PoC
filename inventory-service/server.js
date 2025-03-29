@@ -8,27 +8,30 @@ app.use(express.json())
 
 // MongoDB Atlas Connection
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log('Connected to MongoDB Atlas - inventory-db'))
-  .catch(err => console.error('MongoDB connection error:', err))
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+  .then(() => console.log('✅ Connected to MongoDB Atlas - inventory-db'))
+  .catch(err => console.error('❌ MongoDB connection error:', err))
 
 // Kafka Setup
 const kafka = new Kafka({
   clientId: 'inventory-service',
-  brokers: [process.env.KAFKA_BROKERS]
+  brokers: process.env.KAFKA_BROKERS.split(',')
 })
 const consumer = kafka.consumer({ groupId: 'inventory-group' })
-const producer = kafka.producer({ allowAutoTopicCreation: true })
+const producer = kafka.producer()
 
-const run = async () => {
+const runKafka = async () => {
   await producer.connect()
   await consumer.connect()
-  await consumer.subscribe({ topic: 'order-topic', fromBeginning: true })
+  await consumer.subscribe({ topic: 'order-topic', fromBeginning: false })
 
   await consumer.run({
     eachMessage: async ({ topic, partition, message }) => {
       const order = JSON.parse(message.value.toString())
-      console.log(`Received OrderCreated event: ${JSON.stringify(order)}`)
+      console.log(`📥 Received OrderCreated event: ${JSON.stringify(order)}`)
 
       const session = await mongoose.startSession()
       session.startTransaction()
@@ -36,7 +39,9 @@ const run = async () => {
         const inventory = await Inventory.findOne({
           productId: order.productId
         }).session(session)
+
         if (!inventory || inventory.stock < order.quantity) {
+          console.log(`❌ Insufficient stock for product ${order.productId}`)
           await producer.send({
             topic: 'inventory-topic',
             messages: [
@@ -56,7 +61,7 @@ const run = async () => {
         await inventory.save({ session })
 
         await session.commitTransaction()
-        console.log(`Inventory updated for product ${order.productId}`)
+        console.log(`✅ Inventory updated for product ${order.productId}`)
 
         await producer.send({
           topic: 'inventory-topic',
@@ -64,17 +69,15 @@ const run = async () => {
             {
               value: JSON.stringify({
                 orderId: order.orderId,
-                productId: order.productId,
-                quantity: order.quantity,
-                totalPrice: order.totalPrice, // Thêm totalPrice vào message
-                status: 'InventoryUpdated'
+                status: 'InventoryUpdated',
+                totalPrice: order.totalPrice
               })
             }
           ]
         })
       } catch (error) {
         await session.abortTransaction()
-        console.error(`Error updating inventory: ${error.message}`)
+        console.error(`❌ Error updating inventory: ${error.message}`)
       } finally {
         session.endSession()
       }
@@ -82,59 +85,24 @@ const run = async () => {
   })
 }
 
-// Endpoint để thêm sản phẩm vào kho
+// API: Add product to inventory
 app.post('/products', async (req, res) => {
   const { productId, stock } = req.body
-
-  if (!productId || !stock || stock < 0) {
+  if (!productId || stock < 0) {
     return res.status(400).json({ error: 'Invalid productId or stock' })
   }
 
-  const session = await mongoose.startSession()
-  session.startTransaction()
   try {
-    const existingProduct = await Inventory.findOne({ productId }).session(
-      session
-    )
-    if (existingProduct) {
-      return res.status(400).json({ error: 'Product already exists' })
-    }
-
-    const inventory = new Inventory({
-      productId,
-      stock,
-      updatedAt: new Date()
-    })
-    await inventory.save({ session })
-
-    await session.commitTransaction()
-    res.status(201).json({ message: 'Product added', productId })
+    const inventory = new Inventory({ productId, stock, updatedAt: new Date() })
+    await inventory.save()
+    res.status(201).json({ message: '✅ Product added', productId })
   } catch (error) {
-    await session.abortTransaction()
-    console.error(`Error adding product: ${error.message}`)
+    console.error(`❌ Error adding product: ${error.message}`)
     res.status(500).json({ error: 'Failed to add product' })
-  } finally {
-    session.endSession()
   }
 })
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK' })
-})
+app.get('/health', (req, res) => res.status(200).json({ status: 'OK' }))
 
-run().catch(console.error)
-
-const promClient = require('prom-client')
-const collectDefaultMetrics = promClient.collectDefaultMetrics
-collectDefaultMetrics()
-
-const metricsMiddleware = require('express-prometheus-middleware')
-app.use(
-  metricsMiddleware({
-    metricsPath: '/metrics',
-    collectDefaultMetrics: true
-  })
-)
-
-app.listen(3001, () => console.log('Inventory Service running on port 3001'))
+runKafka().catch(console.error)
+app.listen(3001, () => console.log('🚀 Inventory Service running on port 3001'))

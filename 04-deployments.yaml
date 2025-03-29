@@ -43,7 +43,7 @@ spec:
         - name: MONGO_URI
           value: "mongodb+srv://$(MONGO_USERNAME):$(MONGO_PASSWORD)@cluster0.zeztdiz.mongodb.net/chaos-poc-inventory-db?retryWrites=true&w=majority&appName=Cluster0"
         - name: KAFKA_BROKERS
-          value: "my-kafka:9092"
+          value: "kafka-service.kafka.svc.cluster.local:9092"
         - name: KAFKAJS_NO_PARTITIONER_WARNING
           value: "1"
         resources:
@@ -115,7 +115,7 @@ spec:
         - name: MONGO_URI
           value: "mongodb+srv://$(MONGO_USERNAME):$(MONGO_PASSWORD)@cluster0.zeztdiz.mongodb.net/chaos-poc-order-db?retryWrites=true&w=majority&appName=Cluster0"
         - name: KAFKA_BROKERS
-          value: "my-kafka:9092"
+          value: "kafka-service.kafka.svc.cluster.local:9092"
         - name: KAFKAJS_NO_PARTITIONER_WARNING
           value: "1"
         resources:
@@ -187,7 +187,7 @@ spec:
         - name: MONGO_URI
           value: "mongodb+srv://$(MONGO_USERNAME):$(MONGO_PASSWORD)@cluster0.zeztdiz.mongodb.net/chaos-poc-payment-db?retryWrites=true&w=majority&appName=Cluster0"
         - name: KAFKA_BROKERS
-          value: "my-kafka:9092"
+          value: "kafka-service.kafka.svc.cluster.local:9092"
         - name: KAFKAJS_NO_PARTITIONER_WARNING
           value: "1"
         resources:
