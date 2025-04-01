@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-service
+  namespace: kafka
+  labels:
+    app: zookeeper
+spec:
+  type: NodePort
+  ports:
+  - name: client
+    port: 2181
+    nodePort: 30181
+    targetPort: 2181
+  selector:
+    app: zookeeper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-headless
+  namespace: kafka
+  labels:
+    app: zookeeper
+spec:
+  ports:
+  - name: server
+    port: 2888
+  - name: leader-election
+    port: 3888
+  clusterIP: None
+  selector:
+    app: zookeeper
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeeper-config
+  namespace: kafka
+data:
+  init.sh: |
+    #!/bin/bash
+    set -ex
+    mkdir -p /data/zookeeper
+    chown -R 1000:1000 /data/zookeeper
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: kafka
+  labels:
+    app: zookeeper
+spec:
+  serviceName: zookeeper-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      initContainers:
+      - name: init-config
+        image: busybox
+        command: ['/bin/sh', '-c', 'sh /config-map/init.sh']
+        volumeMounts:
+        - name: config-map
+          mountPath: /config-map
+        - name: data
+          mountPath: /data
+      containers:
+      - name: zookeeper
+        image: wurstmeister/zookeeper
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 2181
+          name: client
+        - containerPort: 2888
+          name: server
+        - containerPort: 3888
+          name: leader-election
+        env:
+        - name: ZOO_DATA_DIR
+          value: "/data/zookeeper"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "echo ruok | nc localhost 2181 | grep imok"
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "echo ruok | nc localhost 2181 | grep imok"
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+      volumes:
+      - name: config-map
+        configMap:
+          name: zookeeper-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1Gi

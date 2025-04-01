@@ -46,47 +46,25 @@ spec:
           value: "kafka-service.kafka.svc.cluster.local:9092"
         - name: KAFKAJS_NO_PARTITIONER_WARNING
           value: "1"
-        - name: KAFKA_CONNECTION_TIMEOUT
-          value: "10000"
-        - name: KAFKA_RETRY_ATTEMPTS
-          value: "10"
-        - name: KAFKA_RETRY_INTERVAL
-          value: "5000"
         resources:
           requests:
             memory: "256Mi"
             cpu: "250m"
           limits:
             memory: "512Mi"
-            cpu: "350m"  # Giảm từ 500m xuống 350m
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /health
             port: 3001
-          initialDelaySeconds: 30
-          periodSeconds: 15
-          failureThreshold: 3
-          timeoutSeconds: 5
+          initialDelaySeconds: 15
+          periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /health
             port: 3001
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          failureThreshold: 3
-          timeoutSeconds: 3
-        startupProbe:
-          httpGet:
-            path: /health
-            port: 3001
-          initialDelaySeconds: 15
+          initialDelaySeconds: 5
           periodSeconds: 5
-          failureThreshold: 12
-          timeoutSeconds: 3
-      initContainers:
-      - name: wait-for-kafka
-        image: busybox:1.28
-        command: ['sh', '-c', 'until nc -z kafka-service.kafka.svc.cluster.local 9092; do echo waiting for kafka; sleep 5; done;']
 ---
 apiVersion: v1
 kind: Service
@@ -99,7 +77,7 @@ spec:
   ports:
   - port: 3001
     targetPort: 3001
-    nodePort: 30002
+    nodePort: 30002  # Thêm nodePort để truy cập endpoint /products
   type: NodePort
 ---
 apiVersion: apps/v1
@@ -116,7 +94,6 @@ spec:
     metadata:
       labels:
         app: order-service
-   ව: 1.0
     spec:
       containers:
       - name: order-service
@@ -141,47 +118,25 @@ spec:
           value: "kafka-service.kafka.svc.cluster.local:9092"
         - name: KAFKAJS_NO_PARTITIONER_WARNING
           value: "1"
-        - name: KAFKA_CONNECTION_TIMEOUT
-          value: "10000"
-        - name: KAFKA_RETRY_ATTEMPTS
-          value: "10"
-        - name: KAFKA_RETRY_INTERVAL
-          value: "5000"
         resources:
           requests:
             memory: "256Mi"
             cpu: "250m"
           limits:
             memory: "512Mi"
-            cpu: "350m"  # Giảm từ 500m xuống 350m
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /health
             port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 15
-          failureThreshold: 3
-          timeoutSeconds: 5
+          initialDelaySeconds: 15
+          periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /health
             port: 3000
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          failureThreshold: 3
-          timeoutSeconds: 3
-        startupProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 15
+          initialDelaySeconds: 5
           periodSeconds: 5
-          failureThreshold: 12
-          timeoutSeconds: 3
-      initContainers:
-      - name: wait-for-kafka
-        image: busybox:1.28
-        command: ['sh', '-c', 'until nc -z kafka-service.kafka.svc.cluster.local 9092; do echo waiting for kafka; sleep 5; done;']
 ---
 apiVersion: v1
 kind: Service
@@ -235,47 +190,25 @@ spec:
           value: "kafka-service.kafka.svc.cluster.local:9092"
         - name: KAFKAJS_NO_PARTITIONER_WARNING
           value: "1"
-        - name: KAFKA_CONNECTION_TIMEOUT
-          value: "10000"
-        - name: KAFKA_RETRY_ATTEMPTS
-          value: "10"
-        - name: KAFKA_RETRY_INTERVAL
-          value: "5000"
         resources:
           requests:
             memory: "256Mi"
             cpu: "250m"
           limits:
             memory: "512Mi"
-            cpu: "350m"  # Giảm từ 500m xuống 350m
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /health
             port: 3002
-          initialDelaySeconds: 30
-          periodSeconds: 15
-          failureThreshold: 3
-          timeoutSeconds: 5
+          initialDelaySeconds: 15
+          periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /health
             port: 3002
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          failureThreshold: 3
-          timeoutSeconds: 3
-        startupProbe:
-          httpGet:
-            path: /health
-            port: 3002
-          initialDelaySeconds: 15
+          initialDelaySeconds: 5
           periodSeconds: 5
-          failureThreshold: 12
-          timeoutSeconds: 3
-      initContainers:
-      - name: wait-for-kafka
-        image: busybox:1.28
-        command: ['sh', '-c', 'until nc -z kafka-service.kafka.svc.cluster.local 9092; do echo waiting for kafka; sleep 5; done;']
 ---
 apiVersion: v1
 kind: Service
@@ -288,17 +221,3 @@ spec:
   ports:
   - port: 3002
     targetPort: 3002
-  type: ClusterIP
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: service-restart-hooks
-  namespace: kafka
-data:
-  on-kafka-ready.sh: |
-    #!/bin/sh
-    echo "Kafka is ready, triggering services restart..."
-    kubectl rollout restart deployment/inventory-service -n kafka
-    kubectl rollout restart deployment/order-service -n kafka
-    kubectl rollout restart deployment/payment-service -n kafka
