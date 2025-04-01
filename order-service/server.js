@@ -100,5 +100,7 @@ app.post('/orders', async (req, res) => {
 })
 
 app.get('/health', (req, res) => res.status(200).json({ status: 'OK' }))
+
 runKafka().catch(console.error)
+
 app.listen(3000, () => console.log('🚀 Order Service running on port 3000'))

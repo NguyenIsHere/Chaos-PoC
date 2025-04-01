@@ -76,5 +76,6 @@ const runKafka = async () => {
 
 app.get('/health', (req, res) => res.status(200).json({ status: 'OK' }))
 
-app.listen(3002, () => console.log('🚀 Payment Service running on port 3002'))
 runKafka().catch(console.error)
+
+app.listen(3002, () => console.log('🚀 Payment Service running on port 3002'))

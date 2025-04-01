@@ -1,0 +1,15 @@
+{
+  "name": "request-sender",
+  "version": "1.0.0",
+  "main": "request-sender.js",
+  "scripts": {
+    "start": "node request-sender.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.8.4"
+  }
+}
