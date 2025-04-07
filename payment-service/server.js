@@ -79,3 +79,17 @@ app.get('/health', (req, res) => res.status(200).json({ status: 'OK' }))
 runKafka().catch(console.error)
 
 app.listen(3002, () => console.log('🚀 Payment Service running on port 3002'))
+
+process.on('SIGINT', async () => {
+  console.log('👋 SIGINT received, shutting down gracefully...')
+  await consumer.disconnect()
+  await producer.disconnect()
+  process.exit(0)
+})
+
+process.on('SIGTERM', async () => {
+  console.log('👋 SIGTERM received, shutting down gracefully...')
+  await consumer.disconnect()
+  await producer.disconnect()
+  process.exit(0)
+})

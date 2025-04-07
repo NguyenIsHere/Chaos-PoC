@@ -106,3 +106,17 @@ app.get('/health', (req, res) => res.status(200).json({ status: 'OK' }))
 
 runKafka().catch(console.error)
 app.listen(3001, () => console.log('🚀 Inventory Service running on port 3001'))
+
+process.on('SIGINT', async () => {
+  console.log('👋 SIGINT received, shutting down gracefully...')
+  await consumer.disconnect()
+  await producer.disconnect()
+  process.exit(0)
+})
+
+process.on('SIGTERM', async () => {
+  console.log('👋 SIGTERM received, shutting down gracefully...')
+  await consumer.disconnect()
+  await producer.disconnect()
+  process.exit(0)
+})
