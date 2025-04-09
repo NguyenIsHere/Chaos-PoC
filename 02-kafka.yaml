@@ -36,14 +36,15 @@ data:
   init.sh: |
     #!/bin/bash
     set -ex
+    # More thorough cleanup
+    rm -rf /data/kafka/meta.properties
+    rm -rf /data/kafka/__consumer_offsets-*
+    rm -rf /data/kafka/cleaner-offset-checkpoint
+    rm -rf /data/kafka/recovery-point-offset-checkpoint
+    rm -rf /data/kafka/log-start-offset-checkpoint
+    rm -rf /data/kafka/replication-offset-checkpoint
     mkdir -p /data/kafka
     chown -R 1000:1000 /data/kafka
-    
-    # Xử lý Cluster ID
-    if [ -f /data/kafka/meta.properties ]; then
-      echo "Phát hiện meta.properties cũ - xóa để tránh lỗi Cluster ID"
-      rm -f /data/kafka/meta.properties
-    fi
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -90,6 +91,8 @@ spec:
           value: PLAINTEXT://:9092
         - name: KAFKA_ADVERTISED_LISTENERS
           value: PLAINTEXT://kafka-service:9092
+        - name: HOSTNAME_COMMAND
+          value: "hostname -f"
         - name: KAFKA_LOG_DIRS
           value: "/data/kafka"
         - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
@@ -106,26 +109,49 @@ spec:
           value: "9999"
         - name: KAFKA_DELETE_TOPIC_ENABLE
           value: "true"
+        - name: KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS
+          value: "60000"
+        - name: KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS
+          value: "60000"
+        - name: KAFKA_CONTROLLED_SHUTDOWN_ENABLE
+          value: "true"
+        - name: KAFKA_AUTO_LEADER_REBALANCE_ENABLE
+          value: "true"
+        - name: KAFKA_RESTART_ATTEMPTS
+          value: "10"
+        - name: KAFKA_RESTART_DELAY_MS
+          value: "5000"
         volumeMounts:
         - name: data
           mountPath: /data
         readinessProbe:
           tcpSocket:
             port: 9092
-          initialDelaySeconds: 15
-          timeoutSeconds: 5
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+          periodSeconds: 10
+          failureThreshold: 6
         livenessProbe:
           tcpSocket:
             port: 9092
-          initialDelaySeconds: 30
-          timeoutSeconds: 5
-        resources:  # Thêm cấu hình tài nguyên
+          initialDelaySeconds: 60
+          timeoutSeconds: 10
+          periodSeconds: 20
+          failureThreshold: 6
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - "sh"
+              - "-c"
+              - "sleep 10 && kafka-topics.sh --create --if-not-exists --zookeeper zookeeper-service:2181 --partitions 1 --replication-factor 1 --topic __consumer_offsets || true"
+        resources:  
           requests:
             memory: "256Mi"
             cpu: "250m"
           limits:
             memory: "512Mi"
-            cpu: "300m"  # Giảm từ 500m xuống 300m
+            cpu: "300m"
       volumes:
       - name: config-map
         configMap:

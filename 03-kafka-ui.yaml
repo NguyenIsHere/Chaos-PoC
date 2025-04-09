@@ -25,7 +25,7 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 8080
-      nodePort: 30080  # Đã sửa để tránh trùng lặp với phần ports bên dưới
+      nodePort: 30080  
   type: NodePort
 ---
 apiVersion: apps/v1
@@ -73,8 +73,8 @@ spec:
             timeoutSeconds: 5
           resources:
             limits:
-              cpu: "200m"  # Giảm từ 500m xuống 200m
-              memory: "256Mi"  # Giảm từ 512Mi xuống 256Mi
+              cpu: "200m"  
+              memory: "256Mi"  
             requests:
               cpu: "100m"
               memory: "128Mi"

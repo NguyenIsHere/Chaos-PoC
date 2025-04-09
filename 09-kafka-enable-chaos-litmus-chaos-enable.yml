@@ -21,7 +21,7 @@ data:
   SERVER_ADDR: http://chaos-litmus-frontend-service:9091/api/query
   INFRA_SCOPE: cluster
   VERSION: 3.16.0
-  START_TIME: "1743515770215"
+  START_TIME: "1744049265140"
   SKIP_SSL_VERIFY: "false"
   CUSTOM_TLS_CERT: ""
   IS_INFRA_CONFIRMED: "false"
@@ -34,8 +34,8 @@ metadata:
   name: subscriber-secret
   namespace: litmus
 stringData:
-  INFRA_ID: 2dd84e34-e3c0-4028-8769-6116ddc478bd
-  ACCESS_KEY: MTM7DG-7zdYIOA0Rms7UezUJgcQwLPlY
+  INFRA_ID: c4180086-25e4-4691-9f7e-9b3801abd131
+  ACCESS_KEY: C7xEnTLVIOTT1IS6Ru6ZzUEdtZzatmJg
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -4224,7 +4224,7 @@ data:
   containerRuntimeExecutor: k8sapi
   executor: |
     imagePullPolicy: IfNotPresent
-  instanceID: 2dd84e34-e3c0-4028-8769-6116ddc478bd
+  instanceID: c4180086-25e4-4691-9f7e-9b3801abd131
 ---
 apiVersion: v1
 kind: Service
